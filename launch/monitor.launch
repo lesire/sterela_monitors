@@ -1,0 +1,12 @@
+<launch>
+  
+	<!-- Monitor node --> 
+	<node name="monitor" pkg="sterela_monitors" type="monitor.py" output="screen" />
+
+	<!-- Connections -->
+	<node name="relay_low" pkg="topic_tools" type="relay"
+  		args="/robot/robot_laser /obstacle_detector/laser_low" />
+	<node name="relay_high" pkg="topic_tools" type="relay"
+  		args="/robot/pac_laser /obstacle_detector/laser_high" />
+  		 
+</launch>
