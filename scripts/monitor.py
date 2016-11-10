@@ -5,7 +5,7 @@ import rospy
 from enum import Enum
 from geometry_msgs.msg import Twist
 from sensor_msgs.msg import LaserScan
-
+from std_msgs.msg import Bool, Float64
 
 # Enum for describing the states
 class State(Enum):
@@ -37,6 +37,9 @@ class Monitor:
         self.laser_high_subscriber = rospy.Subscriber("/robot/pac_laser", LaserScan, self.laser_high_cb)
         self.command_subscriber = rospy.Subscriber("/safe_pilot/command", Twist, self.command_cb)
         self.command_publisher = rospy.Publisher("/robot/control", Twist, queue_size=10)
+        
+        self.activated_publisher = rospy.Publisher("monitor/activated", Bool, queue_size=10)
+        self.distance_publisher = rospy.Publisher("monitor/distance", Float64, queue_size=10)
 
     def laser_low_cb(self, scan):
         # Here check the containt of the low laser scan and set the zone obstacle value accordingly
@@ -109,21 +112,26 @@ class Monitor:
         # if self.zone2_high or self.zone2_low:
         #     dx2 = min(self.dx2_low, self.dx2_high-self.platform_len/2)
         dx2 = self.dx2_high-self.platform_len/2
-        if self.dx1 >= State.SAFE and dx2 >= State.SAFE:
+        if self.dx1 >= State.SAFE.value and dx2 >= State.SAFE.value:
             self.state=State.SAFE
-        if State.SAFE < self.dx1 < State.WARNING or State.SAFE < dx2 < State.WARNING:
+        if State.SAFE.value < self.dx1 < State.WARNING.value or State.SAFE.value < dx2 < State.WARNING.value:
             self.state = State.WARNING
-        if State.COLLISION < self.dx1 < State.WARNING or State.COLLISION < dx2 < State.WARNING:
+        if State.COLLISION.value < self.dx1 < State.WARNING.value or State.COLLISION.value < dx2 < State.WARNING.value:
             self.state = State.COLLISION
             
         rospy.loginfo("State: " + str(self.state))
+        
+        self.distance_publisher.publish(Float64(min(max(0, dx2), self.dx1)))
+        
         # Use the status of zones to decide, e.g.
-        if self.state == State.WARNING or self.state == State.COLLISION:
+        if False:#self.state == State.WARNING or self.state == State.COLLISION:
             # Send stop!
             if cmd.linear.x < 0.01:
                 rospy.loginfo("Stopped by controller")
             else:
                 rospy.logwarn("MONITOR ACTIVATED")
+                self.activated_publisher.publish(Bool(True))
+                
             self.command_publisher.publish(Twist())
         else:
             # Do nothing, i.e. forward the real Command
